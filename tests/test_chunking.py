@@ -33,12 +33,16 @@ def test_table_survives_structural_chunking_intact():
 
 
 def test_oversized_table_splits_by_rows_with_header_repeated():
-    chunks = structural_chunks([section("8", TABLE)], words, budget=100)
-    assert len(chunks) > 1
-    header = "| Segment | 2024 | 2023 |\n| --- | --- | --- |"
+    text = "\n\n".join([TABLE, "Closing words here. " * 40])
+    chunks = structural_chunks([section("8", text)], words, budget=100)
+    assert len(chunks) > 2
+    table_header = "| Segment | 2024 | 2023 |\n| --- | --- | --- |"
     for c in chunks:
-        assert header in c.text
+        assert c.text.startswith("AMD FY2024 10-K — Item 8: Title\n\n")
         assert len(words(c.text)) <= 100
+    for c in chunks:
+        if "| Segment" in c.text:
+            assert table_header in c.text
     rows = [line for c in chunks for line in c.text.split("\n") if re.match(r"\| Segment \d", line)]
     assert rows == TABLE.split("\n")[2:]
 

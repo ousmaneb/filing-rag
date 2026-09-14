@@ -73,10 +73,10 @@ def structural_chunks(sections: list[dict], spans: Spans, budget: int = WINDOW) 
                 # The embedder reads 512 tokens, so a whole oversized table is partly invisible
                 # to dense search. Split by rows and repeat the header row in every piece so
                 # no row is cut off from its column labels.
-                header = "\n".join(lines[:2])
-                row_budget = body_budget - len(spans(header))
+                columns = "\n".join(lines[:2])
+                row_budget = body_budget - len(spans(columns))
                 units.extend(
-                    f"{header}\n{rows}" for rows in pack(lines[2:], spans, row_budget, "\n")
+                    f"{columns}\n{rows}" for rows in pack(lines[2:], spans, row_budget, "\n")
                 )
             else:
                 units.extend(pack(SENTENCE_END.split(para), spans, body_budget, " "))
