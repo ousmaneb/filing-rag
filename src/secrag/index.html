@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>secrag</title>
+<style>
+  :root {
+    --bg: #fafaf9; --fg: #1c1917; --muted: #78716c; --line: #e7e5e4;
+    --card: #ffffff; --accent: #1d4ed8; --warn: #b45309;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0c0a09; --fg: #e7e5e4; --muted: #a8a29e; --line: #292524;
+      --card: #1c1917; --accent: #93c5fd; --warn: #f59e0b;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 32px 16px 64px; background: var(--bg); color: var(--fg);
+    font: 15px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  main { max-width: 880px; margin: 0 auto; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 20px; }
+  form { display: grid; gap: 8px; }
+  textarea {
+    width: 100%; min-height: 76px; padding: 10px 12px; resize: vertical;
+    font: inherit; color: inherit; background: var(--card);
+    border: 1px solid var(--line); border-radius: 6px;
+  }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  select, button {
+    font: inherit; padding: 7px 12px; color: inherit; background: var(--card);
+    border: 1px solid var(--line); border-radius: 6px; cursor: pointer;
+  }
+  button.primary { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+  button:disabled { opacity: 0.5; cursor: default; }
+  .status { color: var(--muted); font-size: 13px; }
+  section { margin-top: 28px; }
+  h2 {
+    font-size: 12px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase;
+    color: var(--muted); margin: 0 0 8px;
+  }
+  .answer { background: var(--card); border: 1px solid var(--line); border-radius: 6px; padding: 4px 16px; }
+  .answer.refused { border-left: 3px solid var(--warn); }
+  .answer a { color: var(--accent); font-weight: 600; text-decoration: none; }
+  .meta { color: var(--muted); font-size: 13px; margin-top: 8px; }
+  .excerpt { background: var(--card); border: 1px solid var(--line); border-radius: 6px; margin-bottom: 8px; }
+  .excerpt.cited { border-color: var(--accent); }
+  .excerpt summary {
+    cursor: pointer; padding: 10px 14px; display: flex; flex-wrap: wrap; gap: 2px 12px; align-items: baseline;
+  }
+  .excerpt pre {
+    margin: 0; padding: 0 14px 14px; white-space: pre-wrap; overflow-x: auto;
+    font: 13px/1.5 ui-monospace, Menlo, Consolas, monospace;
+  }
+  .tag { color: var(--muted); font-size: 13px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>10-K question answering</h1>
+  <p class="sub">30 filings from 15 companies. Answers cite the excerpts below them, and every excerpt the model saw is listed. Search only skips the model call.</p>
+
+  <form id="form">
+    <textarea id="question" required placeholder="What was NVIDIA's Data Center revenue in fiscal 2025?"></textarea>
+    <div class="row">
+      <select id="variant" aria-label="Pipeline variant">
+        <option value="v3_rerank">v3_rerank</option>
+        <option value="v2_hybrid_rrf">v2_hybrid_rrf</option>
+        <option value="v1_structural_chunks">v1_structural_chunks</option>
+        <option value="v0_baseline">v0_baseline</option>
+      </select>
+      <button class="primary" type="submit" data-endpoint="ask">Ask</button>
+      <button type="submit" data-endpoint="search">Search only</button>
+      <span class="status" id="status" role="status"></span>
+    </div>
+  </form>
+
+  <section id="answer-section" hidden>
+    <h2>Answer</h2>
+    <div class="answer" id="answer"></div>
+    <div class="meta" id="meta"></div>
+  </section>
+
+  <section id="trace-section" hidden>
+    <h2>Retrieved excerpts</h2>
+    <div id="trace"></div>
+  </section>
+</main>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  let endpoint = "ask";
+
+  for (const button of document.querySelectorAll("button[data-endpoint]")) {
+    button.addEventListener("click", () => { endpoint = button.dataset.endpoint; });
+  }
+  $("question").addEventListener("keydown", (event) => {
+    if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) $("form").requestSubmit();
+  });
+
+  function escape(text) {
+    const entities = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
+    return text.replace(/[&<>"']/g, (c) => entities[c]);
+  }
+
+  // Just enough markdown for the model's answers: paragraphs, bullet lists, bold, and
+  // [n] markers turned into links to the excerpt they cite.
+  function render(text) {
+    const html = [];
+    let inList = false;
+    for (const line of escape(text).split("\n")) {
+      const item = line.match(/^\s*[-*] (.*)/);
+      if (item && !inList) { html.push("<ul>"); inList = true; }
+      if (!item && inList) { html.push("</ul>"); inList = false; }
+      if (!line.trim()) continue;
+      html.push(item ? `<li>${item[1]}</li>` : `<p>${line}</p>`);
+    }
+    if (inList) html.push("</ul>");
+    return html.join("")
+      .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+      .replace(/\[(\d+)\]/g, '<a href="#excerpt-$1">[$1]</a>');
+  }
+
+  function renderTrace(results, cited) {
+    $("trace").replaceChildren(...results.map((r) => {
+      const el = document.createElement("details");
+      el.id = `excerpt-${r.index}`;
+      el.className = cited.has(r.index) ? "excerpt cited" : "excerpt";
+      const ranks = Object.entries(r.ranks).map(([name, rank]) => `${name} #${rank}`).join(", ");
+      el.innerHTML = `
+        <summary>
+          <strong>[${r.index}]</strong>
+          <span>${escape(r.chunk_id)}</span>
+          <span class="tag">${r.item ? `Item ${escape(r.item)}` : "no Item"}</span>
+          <span class="tag">score ${r.score.toFixed(4)}</span>
+          <span class="tag">${escape(ranks)}</span>
+        </summary>
+        <pre>${escape(r.text)}</pre>`;
+      return el;
+    }));
+    $("trace-section").hidden = false;
+  }
+
+  $("answer").addEventListener("click", (event) => {
+    const link = event.target.closest("a");
+    if (link) document.querySelector(link.getAttribute("href"))?.setAttribute("open", "");
+  });
+
+  $("form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const buttons = document.querySelectorAll("button");
+    buttons.forEach((b) => { b.disabled = true; });
+    $("status").textContent = endpoint === "ask" ? "Retrieving and asking the model..." : "Retrieving...";
+
+    try {
+      const response = await fetch(`/${endpoint}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ question: $("question").value, variant: $("variant").value }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.detail || response.statusText);
+
+      if (endpoint === "ask") {
+        $("answer").innerHTML = render(data.answer);
+        $("answer").classList.toggle("refused", data.refused);
+        $("meta").textContent =
+          `${data.model} | retrieval ${Math.round(data.retrieval_ms)} ms | ` +
+          `generation ${Math.round(data.generation_ms)} ms | ` +
+          `${data.input_tokens} input / ${data.output_tokens} output tokens`;
+        $("answer-section").hidden = false;
+        renderTrace(data.trace, new Set(data.citations.map((c) => c.index)));
+      } else {
+        $("answer-section").hidden = true;
+        renderTrace(data.results, new Set());
+      }
+      $("status").textContent = "";
+    } catch (error) {
+      $("status").textContent = `Error: ${error.message}`;
+    } finally {
+      buttons.forEach((b) => { b.disabled = false; });
+    }
+  });
+</script>
+</body>
+</html>

@@ -144,9 +144,11 @@ make eval               # generation and judge too; writes reports/ablation.json
 make serve              # API on :8000
 ```
 
-The API has three endpoints. `/search` is retrieval only and free. `/ask` returns the answer,
-its citations, and the full retrieval trace: every excerpt the model was given, with its score
-and its rank from each retriever. It is capped at 60 calls an hour.
+Open http://localhost:8000 for a page that asks questions against any variant and shows the
+answer with its citations linked to the excerpts behind them. The same data is available from
+the API. `/search` is retrieval only and free. `/ask` returns the answer, its citations, and the
+full retrieval trace: every excerpt the model was given, with its score and its rank from each
+retriever. It is capped at 60 calls an hour.
 
 ```
 curl -s localhost:8000/ask -H 'content-type: application/json' \

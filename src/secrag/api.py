@@ -1,9 +1,11 @@
 import threading
 import time
 from collections import deque
+from pathlib import Path
 
 import anthropic
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from secrag.config import VARIANTS, PipelineConfig
@@ -49,6 +51,11 @@ def trace(hits: list[Hit]) -> list[dict]:
         }
         for i, h in enumerate(hits, 1)
     ]
+
+
+@app.get("/", include_in_schema=False)
+def page() -> FileResponse:
+    return FileResponse(Path(__file__).with_name("index.html"))
 
 
 @app.get("/health")
