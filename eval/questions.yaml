@@ -15,112 +15,452 @@
 #
 # Unanswerable questions need no answer or evidence. The system is right when it refuses.
 
+# Gold answers extracted from the filings listed in the corpus map.
+# evidence format: doc_id + section + verbatim quote (whitespace-normalized from
+# BeautifulSoup get_text on the EDGAR primary document).
+
 - id: q01
   type: exact_lookup
   question: What was NVIDIA's Data Center segment revenue in fiscal 2025?
-  answer: null
-  evidence: []
+  answer: "$115,186 million, up 142% from $47,525 million in fiscal 2024."
+  evidence:
+    - doc_id: NVDA_FY2025
+      section: "Notes to Consolidated Financial Statements — revenue by specialized markets"
+      quote: "Data Center $ 115,186 $ 47,525 $ 15,005"
+    - doc_id: NVDA_FY2025
+      section: "Item 7, MD&A"
+      quote: "Data Center revenue for fiscal year 2025 was up 142% from a year ago."
+  note: >
+    Data Center is an end-market line, not a reportable segment. NVIDIA's reportable
+    segments are Compute & Networking and Graphics. The question's wording is loose;
+    accept 115,186 but note the distinction if scoring segment-level retrieval.
 
 - id: q02
   type: exact_lookup
   question: How many employees did Costco have at the end of fiscal 2025?
-  answer: null
-  evidence: []
+  answer: "341,000 worldwide (223,000 US, 55,000 Canada, 63,000 Other International)."
+  evidence:
+    - doc_id: COST_FY2025
+      section: "Item 1, Human Capital"
+      quote: "At the end of 2025, we employed 341,000 employees worldwide."
+    - doc_id: COST_FY2025
+      section: "Item 1, employees by segment table"
+      quote: "Total employees 341,000 333,000 316,000"
 
 - id: q03
   type: exact_lookup
   question: What was JPMorgan Chase's CET1 capital ratio at the end of 2025?
-  answer: null
-  evidence: []
+  answer: >
+    14.6% under the Standardized approach and 14.1% under the Advanced approach at
+    December 31, 2025, against an 11.5% requirement. Down from 15.7%/15.8% in 2024.
+  evidence:
+    - doc_id: JPM_FY2025
+      section: "Capital Risk Management — Selected capital and RWA data"
+      quote: "CET1 capital ratio 14.6 % (c) 15.7 % 11.5 % 14.1 % (c) 15.8 % 11.5 %"
+    - doc_id: JPM_FY2025
+      section: "Capital Risk Management"
+      quote: >
+        The Firm's Standardized CET1 capital ratio requirement, including regulatory
+        buffers, was 11.5% as of December 31, 2025.
+  note: >
+    Two valid values. A retrieval system that returns only one should still be
+    credited; one that returns neither approach label has lost the disambiguation.
 
 - id: q04
   type: comparison
   question: Compare Home Depot's and Lowe's net sales in fiscal 2024.
-  answer: null
-  evidence: []
+  answer: >
+    Home Depot $159,514 million (up 4.5%, +$6.8 billion); Lowe's $83,674 million
+    (down 3.1%). Home Depot was roughly 1.9x Lowe's. Fiscal years are not
+    equivalent: HD fiscal 2024 had 53 weeks, Lowe's had 52.
+  evidence:
+    - doc_id: HD_FY2024
+      section: "Item 7, Results of Operations"
+      quote: "Net sales for fiscal 2024 increased $6.8 billion, or 4.5%, to $159.5 billion."
+    - doc_id: HD_FY2024
+      section: "Item 7, results table"
+      quote: "Net sales $ 159,514 $ 152,669 $ 157,403"
+    - doc_id: LOW_FY2024
+      section: "Item 7, Results of Operations"
+      quote: "Net sales decreased 3.1% to $83.7 billion in fiscal 2024."
+    - doc_id: HD_FY2024
+      section: "Item 7"
+      quote: "Fiscal 2024 consisted of 53 weeks compared to 52 weeks in fiscal 2023."
+    - doc_id: LOW_FY2024
+      section: "Item 7"
+      quote: "The fiscal years ended January 31, 2025 and February 2, 2024 had 52 weeks."
+  note: >
+    The week-count mismatch is the substantive part of this comparison. HD attributes
+    ~$2.5 billion of its increase to the extra week and $6.4 billion to the SRS
+    acquisition, so organic HD growth was negative. An answer giving only the two
+    totals is retrieval-correct but analytically incomplete.
 
 - id: q05
   type: comparison
   question: Which had the higher gross margin in fiscal 2025, AMD or Intel?
-  answer: null
-  evidence: []
+  answer: "AMD, at 50% versus Intel's 34.8%."
+  evidence:
+    - doc_id: AMD_FY2025
+      section: "Item 7, MD&A"
+      quote: >
+        Gross margin of 50% increased by 1% compared to 49% in 2024, primarily due to
+        product mix
+    - doc_id: INTC_FY2025
+      section: "MD&A, consolidated results of operations table"
+      quote: "Gross profit 18,375 34.8 % 17,345 32.7 % 21,711 40.0 %"
+  note: >
+    Both are GAAP. AMD's 50% is after roughly $440 million of MI308 export-control
+    inventory charges; Intel's 34.8% is after $950 million of impairment and
+    accelerated depreciation. Intel's own gross-margin percentage appears only in a
+    chart image in the Gross Profit subsection — the number above comes from the
+    percent-of-revenue column of the results table, which is the only place it exists
+    as text. Worth knowing if your extractor drops images.
 
 - id: q06
   type: comparison
   question: Compare Wells Fargo's and Bank of America's net interest income for 2025.
-  answer: null
-  evidence: []
+  answer: >
+    Bank of America $60,096 million (up $4.0 billion from $56,060 million);
+    Wells Fargo $47,484 million (down from $47,676 million). BAC exceeded WFC by
+    about $12.6 billion, and the two moved in opposite directions.
+  evidence:
+    - doc_id: BAC_FY2025
+      section: "Item 7, Net Interest Income"
+      quote: "Net interest income increased $4.0 billion to $60.1 billion in 2025 compared to 2024."
+    - doc_id: BAC_FY2025
+      section: "Item 7, financial highlights"
+      quote: "Net interest income $ 60,096 $ 56,060 $ 56,931"
+    - doc_id: WFC_FY2025
+      section: "Exhibit 13, Earnings Performance — Table 3"
+      quote: "Net interest income $ 47,484 47,676 52,375"
+    - doc_id: WFC_FY2025
+      section: "Exhibit 13, Earnings Performance"
+      quote: >
+        Net interest income decreased in 2025, compared with 2024, driven by the impact
+        of lower interest rates on floating rate assets and deposit mix
+  note: >
+    Both figures are GAAP and directly comparable. BAC also discusses an FTE basis for
+    net interest yield (2.01%) in the same paragraph — do not let a retriever conflate
+    the yield with the income figure.
 
 - id: q07
   type: multi_hop
   question: What share of Broadcom's fiscal 2025 revenue came from its semiconductor solutions segment?
-  answer: null
-  evidence: []
+  answer: >
+    58% — $36,858 million of $63,887 million total net revenue (57.7% exact). Same
+    share as fiscal 2024, though segment revenue grew 22%.
+  evidence:
+    - doc_id: AVGO_FY2025
+      section: "Item 7, net revenue by segment"
+      quote: "Semiconductor solutions $ 36,858 $ 30,096 $ 6,762 22 %"
+    - doc_id: AVGO_FY2025
+      section: "Item 7, net revenue by segment"
+      quote: "Total net revenue $ 63,887 $ 51,574"
+    - doc_id: AVGO_FY2025
+      section: "Item 7, segment revenue as a percentage of net revenue"
+      quote: "Semiconductor solutions 58 % 58 %"
+  note: >
+    The filing states the percentage directly, so the "multi_hop" label is generous —
+    a single-table lookup suffices. If you want a genuine two-hop item here, ask for
+    the share net of the 32% single-distributor concentration instead.
 
 - id: q08
   type: multi_hop
   question: How much did Target's comparable sales change in fiscal 2024, and what reasons did management give?
-  answer: null
-  evidence: []
+  answer: >
+    Comparable sales rose 0.1%. Management attributes this to a 1.4% increase in
+    traffic, partly offset by a 1.3% decrease in average transaction amount. By
+    channel, digitally originated comparable sales grew 7.5% while store-originated
+    fell 1.6%. Separately, total net sales fell 0.8% to $106.6 billion because fiscal
+    2024 had one fewer week than fiscal 2023.
+  evidence:
+    - doc_id: TGT_FY2024
+      section: "Item 7, Financial Summary"
+      quote: >
+        Comparable sales increased 0.1 percent, driven by a 1.4 percent increase in
+        traffic and partially offset by a 1.3 percent decrease in average transaction
+        amount.
+    - doc_id: TGT_FY2024
+      section: "Item 7, Comparable Sales by Channel"
+      quote: "Stores originated comparable sales change (1.6)%"
+    - doc_id: TGT_FY2024
+      section: "Item 7, Comparable Sales by Channel"
+      quote: "Digitally originated comparable sales change 7.5"
+    - doc_id: TGT_FY2024
+      section: "Item 7, Financial Summary"
+      quote: >
+        Net Sales were $106.6 billion, a decrease of $0.8 billion, or 0.8 percent, from
+        the prior year, driven by one less week in the current year.
+  note: >
+    The comp-sales increase and the net-sales decrease point opposite directions; both
+    belong in a correct answer. Comparable sales exclude the 53rd week, net sales do not.
 
 - id: q09
   type: multi_hop
   question: What was Goldman Sachs's return on average common shareholders' equity in 2025, and how did it compare with the firm's stated target?
-  answer: null
-  evidence: []
+  answer: >
+    ROE was 15.0% for 2025, up from 12.7% in 2024. The firm's stated through-the-cycle
+    target is 14% to 16%, so 2025 landed mid-range — inside the target, unlike 2024.
+  evidence:
+    - doc_id: GS_FY2025
+      section: "Item 7, Executive Overview"
+      quote: "ROE was 15.0% for 2025, compared with 12.7% for 2024."
+    - doc_id: GS_FY2025
+      section: "Item 7"
+      quote: >
+        Our target (through-the-cycle) is to achieve ROE within a range of 14% to 16%
+        and ROTE within a range of 15% to 17%.
+  note: >
+    Distractor present: the same filing states a separate high-teens (17-19%) ROE
+    target announced in 2026 for the Asset & Wealth Management segment only, where
+    2025 ROE was 12.5%. A retriever that grabs the segment target and calls the firm
+    a miss has failed this item.
 
 - id: q10
   type: temporal
   question: How did Texas Instruments' revenue change from fiscal 2024 to fiscal 2025?
-  answer: null
-  evidence: []
+  answer: >
+    Revenue rose to $17.68 billion in 2025 from $15.64 billion in 2024 — an increase of
+    $2.04 billion, or 13.0% — driven by higher demand in Analog and, to a lesser
+    extent, Embedded Processing.
+  evidence:
+    - doc_id: TXN_FY2025
+      section: "Item 7, Details of financial results — 2025 compared with 2024"
+      quote: >
+        Revenue of $17.68 billion increased $2.04 billion, or 13.0%, due to higher
+        revenue from increased demand in our Analog segment
+  note: >
+    The 2024 base of $15.64 billion is arithmetic from the stated delta, not a quoted
+    figure in this passage. Gross profit percentage fell to 57.0% from 58.1% despite
+    the revenue growth, which is the more interesting temporal signal if you want one.
 
 - id: q11
   type: temporal
-  question: How did Walmart's global eCommerce sales growth change between fiscal 2025 and fiscal 2026?
-  answer: null
-  evidence: []
+  question: How did Walmart's eCommerce growth by segment change between fiscal 2025 and fiscal 2026?
+  answer: >
+    Walmart US eCommerce contributed approximately 4.3% to comparable sales in fiscal
+    2026 versus 2.9% in fiscal 2025; Sam's Club US contributed 3.3% versus 2.3%;
+    Walmart International eCommerce grew $6.3 billion in fiscal 2026 versus $4.7 billion
+    in fiscal 2025.
+  evidence:
+    - doc_id: WMT_FY2026
+      section: "Item 7, Results of Operations — Walmart U.S."
+      quote: >
+        Walmart U.S. eCommerce sales positively contributed approximately 4.3% and 2.9%
+        to comparable sales for fiscal 2026 and 2025, respectively.
+    - doc_id: WMT_FY2026
+      section: "Item 7, Results of Operations — Sam's Club U.S."
+      quote: >
+        Sam's Club U.S. eCommerce sales positively contributed approximately 3.3% and
+        2.3% to comparable sales for fiscal 2026 and 2025, respectively.
+    - doc_id: WMT_FY2026
+      section: "Item 7, Results of Operations — Walmart International"
+      quote: >
+        which includes strong eCommerce growth of $6.3 billion and $4.7 billion for
+        fiscal 2026 and 2025, respectively
+  note: >
+    Rewritten from a question about consolidated global eCommerce growth, which neither
+    10-K discloses; Walmart reports that figure in earnings releases. Asking by segment
+    matches what the FY2026 filing states.
 
 - id: q12
   type: temporal
   question: How did Morgan Stanley's Wealth Management net revenues change from 2024 to 2025?
-  answer: null
-  evidence: []
+  answer: >
+    Up 12%, to $31,754 million in 2025 from $28,420 million in 2024 (+$3,334 million),
+    reflecting higher asset management revenues on higher market levels and cumulative
+    positive fee-based flows, plus higher transactional revenues on higher client
+    activity. Pre-tax margin was 29.3%.
+  evidence:
+    - doc_id: MS_FY2025
+      section: "MD&A, Business Segments — Wealth Management"
+      quote: >
+        Wealth Management net revenues of $31,754 million in 2025 increased 12% from
+        the prior year, primarily reflecting higher Asset management revenues on higher
+        market levels and the cumulative impact of positive fee-based flows
+    - doc_id: MS_FY2025
+      section: "MD&A, Wealth Management results table"
+      quote: "Net revenues 31,754 28,420 26,268 12"
+  note: >
+    Distractor present: the filing also reports a non-GAAP Wealth Management net
+    revenue adjusted for mark-to-market on deferred compensation plan investments.
+    The GAAP figure is the one above.
 
 - id: q13
   type: qualitative
   question: What risks does AMD describe from its reliance on TSMC for manufacturing?
-  answer: null
-  evidence: []
+  answer: >
+    AMD describes four linked risks. First, single-source concentration: it relies on
+    TSMC for all wafers for microprocessor and GPU products at 7nm or smaller, and
+    TSMC manufactures its newest IC products. Second, supply shortfall — if TSMC cannot
+    produce sufficient quantities to meet customer demand, AMD may have to ration
+    supply among customers, damaging those relationships, and could lose sales; the
+    filing says this could have a material adverse effect. Third, process-transition
+    and yield risk: AMD's 7nm-and-below roadmap is focused on TSMC's processes, and
+    TSMC must successfully transition to advanced nodes and larger wafer sizes at
+    acceptable yields and on time, or AMD faces delivery delays and competitive
+    disadvantage if rivals transition first. Fourth, geographic concentration in
+    Taiwan — the filing names both China-Taiwan geopolitical tension and natural
+    disaster, citing the April 2024 Taiwan earthquake near its foundries.
+  evidence:
+    - doc_id: AMD_FY2025
+      section: "Item 1A, Risk Factors — manufacturing"
+      quote: >
+        We rely on Taiwan Semiconductor Manufacturing Company Limited (TSMC) for the
+        production of all wafers for microprocessor and GPU products at 7 nanometer
+        (nm) or smaller nodes
+    - doc_id: AMD_FY2025
+      section: "Item 1A, Risk Factors — manufacturing"
+      quote: >
+        If we experience supply constraints from our third-party manufacturing
+        suppliers, we may be required to allocate the reduced quantities of affected
+        products amongst our customers
+    - doc_id: AMD_FY2025
+      section: "Item 1A, Risk Factors — yields and process technology"
+      quote: >
+        we are presently focusing our 7 nm and lower product microprocessor and GPU
+        portfolio on TSMC's processes
+    - doc_id: AMD_FY2025
+      section: "Item 1A, Risk Factors — international operations"
+      quote: >
+        geopolitical changes between China and Taiwan could disrupt the operations of
+        our Taiwan-based third-party wafer foundries
+    - doc_id: AMD_FY2025
+      section: "Item 1A, Risk Factors — natural disasters"
+      quote: >
+        In April 2024, Taiwan experienced an earthquake where our third-party wafer
+        foundries are located.
+  note: >
+    The TSMC risk is spread across at least four separate risk factors, not
+    consolidated in one. A chunk-level retriever that returns only the first will
+    produce a partial answer that reads complete. Good discrimination item.
 
 - id: q14
   type: qualitative
   question: How does Costco describe the role of membership fees in its business model?
-  answer: null
-  evidence: []
+  answer: >
+    Costco frames membership as structurally central rather than as a revenue line.
+    The business concept is low prices on a limited selection at high volume and rapid
+    turnover, which lets it operate profitably at significantly lower gross margins
+    than most retailers — membership fees are what make that low-margin merchandising
+    viable. The filing calls membership loyalty and growth essential, and says growth
+    in the member base, Executive-membership penetration, and renewal rates materially
+    influence profitability. The membership format also serves an operational purpose:
+    controlled entrances and exits keep shrinkage well below typical retail. Fees are
+    also a primary source of operating cash flow. In fiscal 2025 membership fee revenue
+    was $5,323 million, up 10%, with renewal rates of 92.3% in the US and Canada and
+    89.8% worldwide, and Executive members accounted for about 73.6% of worldwide net
+    sales.
+  evidence:
+    - doc_id: COST_FY2025
+      section: "Item 1, Business"
+      quote: >
+        these volumes and turnover enable us to operate profitably at significantly
+        lower gross margins (net sales less merchandise costs) than most other retailers
+    - doc_id: COST_FY2025
+      section: "Item 1A, Risk Factors"
+      quote: >
+        Membership loyalty and growth are essential to our business. The extent to which
+        we achieve growth in our membership base, increase the penetration of Executive
+        membership, and sustain high renewal rates materially influences our profitability.
+    - doc_id: COST_FY2025
+      section: "Item 1, Business"
+      quote: >
+        By strictly controlling the entrances and exits and using a membership format,
+        we believe our inventory losses (shrinkage) are well below those of typical
+        retail operations.
+    - doc_id: COST_FY2025
+      section: "Item 7, Membership Fees"
+      quote: "Membership fees $ 5,323 $ 4,828 $ 4,580"
+    - doc_id: COST_FY2025
+      section: "Item 7, Liquidity and Capital Resources"
+      quote: "Our cash flow provided by operations is primarily from net sales and membership fees."
+  note: >
+    Spans Item 1, Item 1A and Item 7. The conceptual claim (low fees subsidize low
+    margins) and the quantitative one ($5,323 million) live in different sections.
 
 - id: q15
   type: qualitative
   question: How does Bank of America describe board oversight of cybersecurity risk?
-  answer: null
-  evidence: []
+  answer: >
+    The Board is described as actively engaged in oversight of the Global Information
+    Security (GIS) Program, and is said to include members with technology and
+    cybersecurity experience; it oversees management's approach to staffing and to the
+    policies and procedures addressing cybersecurity risk. The Board and its Enterprise
+    Risk Committee, which is responsible for reviewing cybersecurity risk, each receive
+    regular presentations, memoranda and reports from the Chief Technology and
+    Information Officer and the Chief Information Security Officer on internal and
+    external developments, threats and risks. The Board receives prompt notice of
+    incidents that may pose significant risk — including incidents at third-party
+    service providers — and continuing reports until resolution, plus quarterly reports
+    on GIS performance metrics and cybersecurity risk appetite metrics, and immediate
+    notification if a Board-level cybersecurity risk limit is breached. The ERC
+    annually reviews and approves the GIS Program and the Information Security Policy.
+    This sits within a three-lines-of-defense structure (GIS, Global Compliance and
+    Operational Risk, Corporate Audit) with escalation to executive management, Board
+    committees, or the Board as appropriate.
+  evidence:
+    - doc_id: BAC_FY2025
+      section: "MD&A, Compliance and Operational Risk Management — Cybersecurity, Governance"
+      quote: >
+        The Board is actively engaged in the oversight of the GIS Program and devotes
+        time and attention to the oversight and mitigation of cybersecurity risk.
+    - doc_id: BAC_FY2025
+      section: "MD&A, Cybersecurity — Governance"
+      quote: >
+        The Board and its ERC, which is responsible for reviewing cybersecurity risk,
+        each receive regular presentations, memoranda and reports
+    - doc_id: BAC_FY2025
+      section: "MD&A, Cybersecurity — Governance"
+      quote: >
+        the Board receives quarterly reports on the performance metrics for the GIS
+        Program and the performance of the Corporation's cybersecurity risk appetite
+        metrics
+    - doc_id: BAC_FY2025
+      section: "MD&A, Cybersecurity — Governance"
+      quote: >
+        Our ERC also annually reviews and approves our GIS Program and our Information
+        Security Policy
+  note: >
+    Retrieval trap worth keeping. Item 1C contains no substance — it is a single
+    cross-reference sentence to the MD&A. A retriever that lands on the Item 1C heading
+    and stops returns nothing usable. Your corpus map pointed at Item 1C; the content
+    is roughly 7,000 lines away in extracted text.
 
 # Apple is outside the corpus. A model knows this from pretraining; retrieval has nothing
 # on it. Answering anyway means the system has stopped being a retrieval system.
 - id: q16
   type: unanswerable
   question: What was Apple's iPhone revenue in fiscal 2025?
-  answer: null
+  answer: "NOT_IN_CORPUS"
   evidence: []
+  expected_behavior: >
+    Decline and state that no Apple filing is in the corpus. Any dollar figure is a
+    pretraining leak regardless of accuracy. Scoring a numerically correct answer as
+    correct defeats the item.
 
 - id: q17
   type: unanswerable
   question: What was NVIDIA's Data Center revenue in fiscal 2019?
-  answer: null
+  answer: "NOT_IN_CORPUS"
   evidence: []
+  expected_behavior: >
+    Decline. NVDA_FY2025 presents only fiscal 2025, 2024 and 2023 (years ended
+    Jan 26 2025, Jan 28 2024, Jan 29 2023). Fiscal 2019 is four years outside the
+    comparative window. Harder than q16 — the right company is in the corpus, so a
+    retriever may return the correct document and the model may then supply the year
+    from memory. Watch specifically for a confident answer citing NVDA_FY2025.
 
 - id: q18
   type: unanswerable
   question: What revenue guidance did Intel give for fiscal 2027?
-  answer: null
+  answer: "NOT_IN_CORPUS"
   evidence: []
+  expected_behavior: >
+    Decline. INTC_FY2025 contains no fiscal 2027 revenue guidance; 10-Ks do not
+    generally carry forward revenue guidance, which appears in earnings releases.
+    The filing does mention 2027 in unrelated contexts — UMC 12nm production beginning
+    in 2027, Foveros-B and Foveros-R high-volume manufacturing in 2027, non-controlling
+    interest increases in 2027, Fab 34 volume commitments from Q3 2027, an accounting
+    standard effective in 2027. These are the distractors; a model that converts any
+    of them into "guidance" has failed.

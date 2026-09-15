@@ -6,23 +6,26 @@ below is the point.
 
 ## Results
 
-18 questions (15 answerable, 3 unanswerable), k = 8. Filled in from `make eval`.
+18 questions (15 answerable, 3 unanswerable), k = 8. The retrieval and latency columns are
+from `make eval-fast`, with latency measured on an Apple-silicon Mac. The generation columns
+stay blank until a full `make eval` completes. With 15 answerable questions, one question moves
+recall@8 by about 0.07 and each hit@8 cell below by 0.33, so small gaps are noise.
 
 | variant | recall@8 | MRR | nDCG@8 | correct | faithful | citation valid | refusal acc | uncited numeric | p50 ms | p95 ms | $/query |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| v0_baseline | | | | | | | | | | | |
-| v1_structural_chunks | | | | | | | | | | | |
-| v2_hybrid_rrf | | | | | | | | | | | |
-| v3_rerank | | | | | | | | | | | |
+| v0_baseline | 0.374 | 0.325 | 0.245 | | | | | | 22 | 29 | |
+| v1_structural_chunks | 0.353 | 0.267 | 0.241 | | | | | | 21 | 27 | |
+| v2_hybrid_rrf | 0.510 | 0.366 | 0.327 | | | | | | 49 | 58 | |
+| v3_rerank | 0.547 | 0.410 | 0.334 | | | | | | 4461 | 4516 | |
 
 hit@8 by question type:
 
 | variant | exact_lookup | comparison | multi_hop | temporal | qualitative |
 |---|---|---|---|---|---|
-| v0_baseline | | | | | |
-| v1_structural_chunks | | | | | |
-| v2_hybrid_rrf | | | | | |
-| v3_rerank | | | | | |
+| v0_baseline | 0.667 | 1.000 | 0.333 | 0.333 | 1.000 |
+| v1_structural_chunks | 0.333 | 0.667 | 0.333 | 0.333 | 1.000 |
+| v2_hybrid_rrf | 0.333 | 1.000 | 1.000 | 0.667 | 1.000 |
+| v3_rerank | 0.667 | 1.000 | 1.000 | 0.667 | 1.000 |
 
 Each row changes one thing from the row above it:
 
@@ -160,4 +163,21 @@ Model IDs come from `SECRAG_GENERATION_MODEL` and `SECRAG_JUDGE_MODEL`, both def
 
 ## Known failures
 
-To be filled in from the first real run.
+**Short facts inside long structural chunks.** Costco's employee count (q02) sits in a
+390-word Item 1 chunk that is mostly business description. Dense search ranks that chunk
+46th; BM25 ranks it 4th on the exact figure. The fixed-window baseline found it by luck,
+because one of its windows happened to be mostly about headcount. Packing whole paragraphs up
+to the token budget trades this case away.
+
+**The reranker scores tables of numbers low.** For NVIDIA's fiscal 2025 Data Center revenue
+(q01), the chunk holding the revenue-by-market table ranked 3rd on dense search and 4th after
+RRF, and bge-reranker-base moved it to 25th with a score of 0.07. The row was inside the
+reranker's 512-token window, and adding the table's caption only raised the score to 0.08.
+
+**Generic wording has nothing to match.** "How did Texas Instruments' revenue change" (q10)
+matches most of Item 7. The one sentence stating the change ranks 24th on dense search with
+structural chunks and never reaches the top 8 in any variant.
+
+**Reranking costs a lot for what it adds.** Scoring 50 candidates with bge-reranker-base
+takes about 4.5 seconds per query, against 20 to 50 ms for the other variants. In this run it
+added 0.037 recall@8 and 0.044 MRR over hybrid search.
