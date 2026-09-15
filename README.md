@@ -158,8 +158,10 @@ curl -s localhost:8000/ask -H 'content-type: application/json' \
   -d '{"question": "What was NVIDIA Data Center revenue in fiscal 2025?", "variant": "v3_rerank"}'
 ```
 
-Model IDs come from `SECRAG_GENERATION_MODEL` and `SECRAG_JUDGE_MODEL`, both defaulting to
-`claude-opus-5`.
+Model IDs come from `SECRAG_GENERATION_MODEL` and `SECRAG_JUDGE_MODEL`, defaulting to
+`claude-opus-5` for answers and `claude-sonnet-5` for the judge. The judge only grades against
+the reference and the excerpts, so it doesn't need the larger model. A full eval run saves each
+result as it finishes and resumes after a failure without paying for finished calls again.
 
 ## Known failures
 

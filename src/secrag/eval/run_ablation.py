@@ -14,6 +14,10 @@ from secrag.generate import answer
 from secrag.retrieval import Retriever
 
 K = 8
+# A full run appends each finished record here, so a run that dies partway (rate limit, empty
+# credit balance) resumes without paying again for calls it already made. Delete the file by
+# hand if you change the questions before resuming.
+PROGRESS = REPORTS_DIR / "ablation_progress.jsonl"
 # USD per million tokens, (input, output). Check against current pricing before quoting costs.
 PRICES = {
     "claude-opus-5": (5.0, 25.0),
@@ -43,11 +47,20 @@ def mean(values: list) -> float:
 def run(
     questions: list[Question], retriever: Retriever, client: anthropic.Anthropic | None
 ) -> list[dict]:
+    done = {}
+    if client and PROGRESS.exists():
+        rows = [json.loads(line) for line in PROGRESS.read_text().splitlines()]
+        done = {(r["variant"], r["id"]): r for r in rows}
+
     records = []
     for cfg in VARIANTS.values():
         # The first query pays for loading BM25 and warming the GPU; keep it out of latency.
         retriever.retrieve("warm up", cfg)
         for q in questions:
+            if (cfg.name, q.id) in done:
+                records.append(done[(cfg.name, q.id)])
+                print(f"{cfg.name} {q.id} already done", flush=True)
+                continue
             record = {"variant": cfg.name, "id": q.id, "type": q.type}
             if client:
                 a = answer(q.question, cfg, retriever, client)
@@ -86,6 +99,9 @@ def run(
             }
             records.append(record)
             print(f"{cfg.name} {q.id} recall={record['recall']:.2f} {latency_ms:.0f}ms", flush=True)
+            if client:
+                with open(PROGRESS, "a") as f:
+                    f.write(json.dumps(record, default=str) + "\n")
     return records
 
 
@@ -141,13 +157,16 @@ def main() -> None:
 
     questions = load()
     client = None if args.retrieval_only else anthropic.Anthropic()
+    REPORTS_DIR.mkdir(exist_ok=True)
     records = run(questions, Retriever(), client)
     summary, by_type = summarize(records)
 
-    REPORTS_DIR.mkdir(exist_ok=True)
     report = {"summary": summary, "hit_by_type": by_type, "records": records}
     (REPORTS_DIR / "ablation.json").write_text(json.dumps(report, indent=2, default=str))
     (REPORTS_DIR / "ablation.md").write_text(markdown(summary, by_type))
+    # A finished run clears its progress, so the next run can't mix in records made
+    # against older questions or code.
+    PROGRESS.unlink(missing_ok=True)
     print(markdown(summary, by_type))
 
 

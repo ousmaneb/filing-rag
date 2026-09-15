@@ -21,7 +21,7 @@ RERANK_MODEL = "BAAI/bge-reranker-base"
 
 # Model IDs live in env: provider catalogues change faster than this repo will.
 GENERATION_MODEL = os.environ.get("SECRAG_GENERATION_MODEL", "claude-opus-5")
-JUDGE_MODEL = os.environ.get("SECRAG_JUDGE_MODEL", "claude-opus-5")
+JUDGE_MODEL = os.environ.get("SECRAG_JUDGE_MODEL", "claude-sonnet-5")
 
 
 @dataclass(frozen=True)
