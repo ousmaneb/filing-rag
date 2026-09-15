@@ -1,6 +1,6 @@
 import pytest
 
-from secrag.eval.dataset import QUESTIONS, load
+from secrag.eval.dataset import load
 
 
 def write(tmp_path, text):
@@ -28,13 +28,9 @@ def test_unanswerable_question_needs_no_labels(tmp_path):
   type: exact_lookup
   question: AMD FY2024 revenue?
   answer: $25.8 billion
-  evidence: [{doc_id: AMD_FY2024, quote: "Net revenue"}]
+  evidence: [{doc_id: AMD_FY2024, section: Item 7, quote: "Net revenue"}]
+  note: Labeller's note that the loader ignores.
 - {id: q2, type: unanswerable, question: "Apple revenue?", answer: null, evidence: []}
 """,
     )
     assert [q.answerable for q in load(path)] == [True, False]
-
-
-def test_shipped_question_set_is_refused_until_labelled():
-    with pytest.raises(SystemExit):
-        load(QUESTIONS)

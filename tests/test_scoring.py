@@ -45,6 +45,16 @@ def test_evidence_quote_matches_through_table_formatting():
     assert relevance(chunks, evidence) == [{0}, set()]
 
 
+def test_evidence_quote_ending_a_sentence_matches_mid_sentence_text():
+    chunks = [
+        {"doc_id": "WMT", "text": "U.S. sales contributed 3.3% and 2.3%, respectively, which"}
+    ]
+    sentence_end = relevance(chunks, [{"doc_id": "WMT", "quote": "and 2.3%, respectively."}])
+    decimal_dropped = relevance(chunks, [{"doc_id": "WMT", "quote": "contributed 33%"}])
+    assert sentence_end == [{0}]
+    assert decimal_dropped == [set()]
+
+
 def test_uncited_claim_rate_counts_numeric_sentences_without_citations():
     text = "Revenue was $25.8 billion in fiscal 2025 [1]. Margins rose to 61%. Demand was strong."
     assert uncited_claim_rate(text) == 0.5

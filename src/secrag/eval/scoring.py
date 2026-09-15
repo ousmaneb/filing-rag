@@ -4,15 +4,16 @@ import re
 # Relevance is labelled as (doc_id, quote) rather than chunk IDs, because chunk IDs differ
 # between strategies. A fixed window that cuts the quote in half does not count as a hit,
 # which is exactly the failure the baseline is meant to show.
-NON_WORD = re.compile(r"[^\w.]+")
+NON_WORD = re.compile(r"[^\w.]+|(?<!\d)\.|\.(?!\d)")
 SENTENCE_END = re.compile(r"(?<=[.!?])\s+")
 CITATION = re.compile(r"\[\d+\]")
 
 
 def normalize(text: str) -> str:
-    # Drops table pipes, "$" and thousands separators so a quote copied from the rendered
-    # filing matches the markdown table it was chunked into.
-    return NON_WORD.sub(" ", text.lower()).strip()
+    # Drops table pipes, "$", thousands separators and sentence periods so a quote copied
+    # from the rendered filing matches the markdown table or sentence it was chunked into.
+    # Decimal points stay, or "25.8" would match "258".
+    return " ".join(NON_WORD.sub(" ", text.lower()).split())
 
 
 def relevance(chunks: list[dict], evidence: list[dict]) -> list[set[int]]:

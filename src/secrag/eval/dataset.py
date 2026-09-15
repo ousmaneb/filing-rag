@@ -23,7 +23,11 @@ class Question:
 
 
 def load(path: Path = QUESTIONS) -> list[Question]:
-    questions = [Question(**q) for q in yaml.safe_load(path.read_text())]
+    # Other keys, like a labeller's note, are for the person reading the file.
+    questions = [
+        Question(q["id"], q["type"], q["question"], q.get("answer"), q.get("evidence") or [])
+        for q in yaml.safe_load(path.read_text())
+    ]
     problems = []
     for q in questions:
         if q.type not in TYPES:
