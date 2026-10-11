@@ -6,7 +6,7 @@ from pathlib import Path
 import anthropic
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from secrag.config import VARIANTS, PipelineConfig
 from secrag.generate import answer
@@ -27,7 +27,8 @@ model_lock = threading.Lock()
 
 
 class Query(BaseModel):
-    question: str
+    # Bounded so one request can't send an arbitrarily large prompt to the model.
+    question: str = Field(min_length=1, max_length=2000)
     variant: str = "v3_rerank"
 
 
