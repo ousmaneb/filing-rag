@@ -1,26 +1,37 @@
+import os
 import threading
-import time
-from collections import deque
 from pathlib import Path
 
 import anthropic
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from secrag.config import VARIANTS, PipelineConfig
 from secrag.generate import answer
 from secrag.retrieval import Hit, Retriever
+from secrag.security import RateLimiter, api_key_ok, bearer_or_header, client_ip, env_int
 
-# Crude on purpose: a global hourly cap on /ask so an exposed demo URL can't drain the
-# API budget overnight. It resets on restart and isn't shared across worker processes.
-ASKS_PER_HOUR = 60
+# Optional. When set, /ask and /search require it in X-API-Key or "Authorization: Bearer".
+# When unset the API stays an open public demo, protected only by the rate limits below.
+API_KEY = os.environ.get("SECRAG_API_KEY", "").strip() or None
+# Number of reverse proxies in front of the app that append to X-Forwarded-For. 0 (the
+# default) ignores the header and uses the socket peer, which can't be spoofed.
+TRUST_PROXY_HOPS = env_int("SECRAG_TRUST_PROXY_HOPS", 0)
+
+# In memory on purpose: they reset on restart and aren't shared across worker processes.
+# The global /ask cap keeps an exposed demo URL from draining the API budget overnight;
+# the per-IP limits stop one caller from using that budget, or the CPU, up for everyone.
+ASKS_PER_HOUR = env_int("SECRAG_ASKS_PER_HOUR", 60)
+ASKS_PER_IP_PER_HOUR = env_int("SECRAG_ASKS_PER_IP_PER_HOUR", 10)
+SEARCHES_PER_IP_PER_MINUTE = env_int("SECRAG_SEARCHES_PER_IP_PER_MINUTE", 20)
 
 app = FastAPI()
 retriever = Retriever()
 client = anthropic.Anthropic()
-recent_asks: deque[float] = deque()
-ask_lock = threading.Lock()
+ask_limit = RateLimiter(ASKS_PER_HOUR, 3600)
+ask_ip_limit = RateLimiter(ASKS_PER_IP_PER_HOUR, 3600)
+search_ip_limit = RateLimiter(SEARCHES_PER_IP_PER_MINUTE, 60)
 # FastAPI runs sync endpoints in a thread pool; the embedder and reranker on MPS are not
 # safe to call from several threads at once.
 model_lock = threading.Lock()
@@ -36,6 +47,19 @@ def config(name: str) -> PipelineConfig:
     if name not in VARIANTS:
         raise HTTPException(404, f"unknown variant {name!r}, expected one of {list(VARIANTS)}")
     return VARIANTS[name]
+
+
+def require_key(
+    authorization: str | None = Header(default=None),
+    x_api_key: str | None = Header(default=None),
+) -> None:
+    if not api_key_ok(API_KEY, bearer_or_header(authorization, x_api_key)):
+        raise HTTPException(401, "missing or invalid API key", {"WWW-Authenticate": "Bearer"})
+
+
+def caller(request: Request) -> str:
+    peer = request.client.host if request.client else None
+    return client_ip(peer, request.headers.get("x-forwarded-for"), TRUST_PROXY_HOPS)
 
 
 def trace(hits: list[Hit]) -> list[dict]:
@@ -64,24 +88,23 @@ def health() -> dict:
     return {"status": "ok"}
 
 
-@app.post("/search")
-def search(query: Query) -> dict:
+@app.post("/search", dependencies=[Depends(require_key)])
+def search(query: Query, ip: str = Depends(caller)) -> dict:
     cfg = config(query.variant)
+    if not search_ip_limit.allow(ip):
+        raise HTTPException(429, "/search rate limit reached, try again in a minute")
     with model_lock:
         hits = retriever.retrieve(query.question, cfg)
     return {"variant": cfg.name, "results": trace(hits)}
 
 
-@app.post("/ask")
-def ask(query: Query) -> dict:
+@app.post("/ask", dependencies=[Depends(require_key)])
+def ask(query: Query, ip: str = Depends(caller)) -> dict:
     cfg = config(query.variant)
-    with ask_lock:
-        now = time.monotonic()
-        while recent_asks and now - recent_asks[0] > 3600:
-            recent_asks.popleft()
-        if len(recent_asks) >= ASKS_PER_HOUR:
-            raise HTTPException(429, "hourly /ask limit reached")
-        recent_asks.append(now)
+    if not ask_ip_limit.allow(ip):
+        raise HTTPException(429, "hourly /ask limit for your address reached")
+    if not ask_limit.allow():
+        raise HTTPException(429, "hourly /ask limit reached")
 
     with model_lock:
         a = answer(query.question, cfg, retriever, client)

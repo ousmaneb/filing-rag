@@ -151,7 +151,17 @@ Open http://localhost:8000 for a page that asks questions against any variant an
 answer with its citations linked to the excerpts behind them. The same data is available from
 the API. `/search` is retrieval only and free. `/ask` returns the answer, its citations, and the
 full retrieval trace: every excerpt the model was given, with its score and its rank from each
-retriever. It is capped at 60 calls an hour.
+retriever.
+
+Both endpoints are rate limited in memory: `/ask` to 10 calls an hour per client address and
+60 an hour in total (the total protects the Anthropic budget), `/search` to 20 a minute per
+address. Set `SECRAG_API_KEY` to require a key on both, sent as `X-API-Key: <key>` or
+`Authorization: Bearer <key>`; the web page asks for it once per tab. Without a key the API
+stays an open demo. Behind a reverse proxy, set `SECRAG_TRUST_PROXY_HOPS` to the number of
+proxies so limits apply to the real client rather than the proxy; it defaults to 0, which
+ignores `X-Forwarded-For` because clients can forge it. The limits and their env vars are in
+`.env.example`. The Docker image runs as an unprivileged user with the models cached under
+`/app/.cache`.
 
 ```
 curl -s localhost:8000/ask -H 'content-type: application/json' \
