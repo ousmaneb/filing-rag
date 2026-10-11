@@ -149,6 +149,17 @@
     if (link) document.querySelector(link.getAttribute("href"))?.setAttribute("open", "");
   });
 
+  function apiKey() {
+    try { return sessionStorage.getItem("secrag-api-key"); } catch { return null; }
+  }
+
+  function post(body) {
+    const headers = { "content-type": "application/json" };
+    const key = apiKey();
+    if (key) headers["x-api-key"] = key;
+    return fetch(`/${endpoint}`, { method: "POST", headers, body });
+  }
+
   $("form").addEventListener("submit", async (event) => {
     event.preventDefault();
     const buttons = document.querySelectorAll("button");
@@ -156,11 +167,16 @@
     $("status").textContent = endpoint === "ask" ? "Retrieving and asking the model..." : "Retrieving...";
 
     try {
-      const response = await fetch(`/${endpoint}`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ question: $("question").value, variant: $("variant").value }),
-      });
+      const body = JSON.stringify({ question: $("question").value, variant: $("variant").value });
+      let response = await post(body);
+      if (response.status === 401) {
+        // The server has SECRAG_API_KEY set: ask once and keep it for this tab only.
+        const key = window.prompt("This server requires an API key:");
+        if (key) {
+          try { sessionStorage.setItem("secrag-api-key", key); } catch {}
+          response = await post(body);
+        }
+      }
       const data = await response.json();
       if (!response.ok) throw new Error(data.detail || response.statusText);
 
